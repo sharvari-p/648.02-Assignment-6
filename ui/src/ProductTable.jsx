@@ -1,34 +1,98 @@
-import React, { Component } from 'react'
-import Table from 'react-bootstrap/Table'
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { LinkContainer } from 'react-router-bootstrap';
+import {
+  Button, Glyphicon, Tooltip, OverlayTrigger, Table,
+} from 'react-bootstrap';
 
-import ProductRow from './ProductRow.jsx'
+const NO_DATA_AVAILABLE = 'No Data Available';
 
-export default class ProductTable extends Component {
-	constructor(props) {
-		super(props);
-	}
+/**
+ * Renders a single Row in the Product table
+ * @param props Expects props as a 'product' object which contains
+ * name, price, category and imageUrl.
+ */
+function ProductTableRow({ product, deleteProduct, index }) {
+  const {
+    name, price, category, imageUrl, id,
+  } = product;
 
-	render() {
-		const rows = this.props.products.map(p => <ProductRow product={p} key={p.id} deleteProduct={this.props.deleteProduct} />)
-		return (
-			<section>
-				<p>Showing all available products</p>
-				<hr />
-				<Table striped bordered hover>
-					<thead>
-						<tr>
-							<td>Product Name</td>
-							<td>Price</td>
-							<td>Category</td>
-							<td>Image</td>
-							<td>Actions</td>
-						</tr>
-					</thead>
-					<tbody>
-						{rows}
-					</tbody>
-				</Table>
-			</ section>
-		)
-	}
+  const deleteTooltip = (
+    <Tooltip id="delete-tooltip" placement="top">Delete Product</Tooltip>
+  );
+
+  const editTooltip = (
+    <Tooltip id="close-tooltip" placement="top">Edit Product</Tooltip>
+  );
+
+  function onDelete(e) {
+    e.preventDefault();
+    deleteProduct(index);
+  }
+
+  return (
+    <tr>
+      <td>{name || NO_DATA_AVAILABLE}</td>
+      <td>{price ? `$${price}` : NO_DATA_AVAILABLE}</td>
+      <td>{category}</td>
+      <td>{imageUrl ? (<Link to={`/img/${id}`}>View</Link>) : NO_DATA_AVAILABLE}</td>
+      <td>
+        <LinkContainer to={`/edit/${id}`}>
+          <OverlayTrigger delayShow={1000} overlay={editTooltip}>
+            <Button bsSize="xsmall">
+              <Glyphicon glyph="edit" />
+            </Button>
+          </OverlayTrigger>
+        </LinkContainer>
+
+        {' | '}
+
+        <OverlayTrigger delayShow={1000} overlay={deleteTooltip}>
+          <Button bsSize="xsmall" onClick={onDelete}>
+            <Glyphicon glyph="trash" />
+          </Button>
+        </OverlayTrigger>
+      </td>
+    </tr>
+  );
+}
+
+/**
+* Renders the Product Table
+* @param props Expects 'headings' and 'products' array as props
+*/
+export default function ProductTable({
+  headings, products, loading, deleteProduct,
+}) {
+  const productTableRows = products.map(
+    (product, index) => (
+      <ProductTableRow
+        key={product.id}
+        product={product}
+        deleteProduct={deleteProduct}
+        index={index}
+      />
+    ),
+  );
+  const initialTableMessage = loading ? 'Loading products...' : 'No Products added yet';
+
+  return (
+    <Table bordered condensed hover responsive className="table-dark">
+      <thead className="text-left bordered-table">
+        <tr>
+          {headings.map((heading, index) =>
+            // using index as keys as Table Headings will not change dynamically
+            // eslint-disable-next-line implicit-arrow-linebreak, react/no-array-index-key
+            <th key={index}>{heading}</th>)}
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {products.length > 0 ? productTableRows : (
+          <tr className="text-center"><td colSpan="5">{initialTableMessage}</td></tr>
+        )}
+      </tbody>
+    </Table>
+  );
 }

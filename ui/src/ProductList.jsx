@@ -1,98 +1,111 @@
-import React, { Component, Fragment } from 'react';
+import React from 'react';
+import { Panel } from 'react-bootstrap';
 
-import ProductAdd from './ProductAdd.jsx'
-import ProductTable from './ProductTable.jsx'
+import ProductTable from './ProductTable.jsx';
+import ProductAdd from './ProductAdd.jsx';
+import graphQLFetch from './graphQLFetch.js';
 
-import graphQLFetch from './graphQLFetch'
+const productTableHeadings = ['Product Name', 'Price', 'Category', 'Image'];
 
-class ProductList extends Component {
-	constructor(props) {
-		super(props);
-		this.state = {
-			products: []
-		}
-		this.addProduct = this.addProduct.bind(this);
-		this.deleteProduct = this.deleteProduct.bind(this);
-		this.getProducts()
-	}
+/**
+ * Entry Point of our Application. Renders the whole page from here.
+ */
+export default class ProductList extends React.Component {
+  constructor() {
+    super();
+    this.state = { products: [], initialLoading: true };
+    this.addProduct = this.addProduct.bind(this);
+    this.deleteProduct = this.deleteProduct.bind(this);
+  }
 
-	getProducts() {
-		const query = `
-		query {
-			productList {
-				_id
-				id
-				Category
-				Price
-				Name
-				Image
-			}
-		}
-		`;
+  componentDidMount() {
+    this.loadData();
+  }
 
-		graphQLFetch(query)
-		.then((res) => {
-			this.setState((state, props) => {
-				state.products = res.data.productList;
-				return state;
-			})
-		})
-		.catch(err => console.error(err))
-	}
+  async loadData() {
+    const query = `
+            query {
+                productList {
+                    id
+                    name
+                    category
+                    price
+                    imageUrl
+                }
+            }
+        `;
 
-	addProduct(product) {
-		const query = `
-		mutation {
-			addProduct (
-				Category: [` + product.Category + `]
-				Name: "` + product.Name + `"
-				Price: ` + product.Price + `
-				Image: "` + product.Image + `"
-			) {
-				_id
-				id
-				Category
-				Price
-				Name
-				Image
-			}
-		}
-		`;
+    const data = await graphQLFetch(query);
 
-		graphQLFetch(query)
-		.then((res) => {
-			this.setState((state, props) => {
-				state.products.push(res.data.addProduct);
-				this.props.showToast("success", "Product Added Successfully")
-				return state;
-			})
-		})
-		.catch(err => console.error(err))
-	}
+    if (data) {
+      this.setState({ products: data.productList, initialLoading: false });
+    }
+  }
 
-	deleteProduct(_id) {
-		const query = `mutation { deleteProduct (_id: "${_id}") }`
+  async addProduct(product) {
+    const query = `
+            mutation addProduct($product: ProductInputs!) {
+                addProduct(product: $product) {
+                    id
+                }
+            }
+        `;
 
-		graphQLFetch(query)
-		.then((res) => {
-			if (res.data.deleteProduct) {
-				this.props.showToast("danger", "Product Deleted Successfully")				
-				this.getProducts();
-			}
-		})
-		.catch(err => console.error(err))
+    const data = await graphQLFetch(query, { product });
+    if (data) {
+      this.loadData();
+    }
+  }
 
-	} 
+  async deleteProduct(index) {
+    const query = `mutation productDelete($id: Int!) {
+      productDelete(id: $id)
+    }`;
+    const { products } = this.state;
+    const { location: { pathname, search }, history } = this.props;
+    const { id } = products[index];
 
-	render() {
-		return (
-			<Fragment>
-				<h2>My Company Inventory</h2>
-				<ProductTable products={this.state.products} deleteProduct={this.deleteProduct} />
-				<ProductAdd addProduct={this.addProduct} />
-			</Fragment>
-		)
-	}
+    const data = await graphQLFetch(query, { id });
+    if (data && data.productDelete) {
+      this.setState((prevState) => {
+        const newList = [...prevState.products];
+        if (pathname === `/products/${id}`) {
+          history.push({ pathname: '/products', search });
+        }
+        newList.splice(index, 1);
+        return { products: newList };
+      });
+    } else {
+      this.loadData();
+    }
+  }
+
+  render() {
+    const { products, initialLoading } = this.state;
+    return (
+      <React.Fragment>
+        <div className="container">
+          <div>Showing all available products</div>
+          <hr />
+          <ProductTable
+            headings={productTableHeadings}
+            products={products}
+            loading={initialLoading}
+            deleteProduct={this.deleteProduct}
+          />
+
+          <hr />
+
+          <Panel defaultExpanded className="panel-dark">
+            <Panel.Heading>
+              <Panel.Title toggle>Add a new Product</Panel.Title>
+            </Panel.Heading>
+            <Panel.Body collapsible>
+              <ProductAdd addProduct={this.addProduct} />
+            </Panel.Body>
+          </Panel>
+        </div>
+      </React.Fragment>
+    );
+  }
 }
-
-export default ProductList;
